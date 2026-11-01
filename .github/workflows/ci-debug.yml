@@ -1,0 +1,49 @@
+name: CI Debugger Agent
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+concurrency:
+  group: ci-debug-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: write
+  contents: write
+
+jobs:
+  debug:
+    # Only run when a workflow failed and wasn't this debugger itself
+    if: ${{ github.event.workflow_run.conclusion == 'failure' && github.event.workflow.name != 'CI Debugger Agent' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run CI debugger agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPO_FULL_NAME: ${{ github.repository }}
+          FAILED_RUN_ID: ${{ github.event.workflow_run.id }}
+          FAILED_WORKFLOW_NAME: ${{ github.event.workflow.name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_TYPE: ${{ github.event.workflow_run.event }}
+          PULL_REQUESTS: ${{ toJson(github.event.workflow_run.pull_requests) }}
+        run: python scripts/ci_debug.py
