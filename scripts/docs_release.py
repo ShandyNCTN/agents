@@ -35,6 +35,8 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-3.8-flash")
 REPO = os.environ["REPO_FULL_NAME"]
 EVENT_NAME = os.environ.get("EVENT_NAME", "push")
 REF_NAME = os.environ.get("REF_NAME", "main")
@@ -49,7 +51,10 @@ GH_HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else None,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +134,7 @@ def check_docs_need_update(commits: list[dict]) -> dict:
     system = load_system_prompt("docs_release")
 
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=LLM_MODEL,
         messages=[
             {"role": "system", "content": system},
             {
@@ -259,7 +264,7 @@ def generate_changelog(prs: list[dict], tag: str, release_name: str) -> str:
 
     system = load_system_prompt("docs_release")
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=LLM_MODEL,
         messages=[
             {"role": "system", "content": system},
             {

@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-3.8-flash")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001")
 REPO = os.environ["REPO_FULL_NAME"]          # e.g. "owner/repo"
 ISSUE_NUMBER = int(os.environ["ISSUE_NUMBER"])
 ISSUE_TITLE = os.environ.get("ISSUE_TITLE", "")
@@ -55,7 +58,10 @@ FAQ_LINKS = """
 - 🔍 [Search existing issues](../../issues?q=is%3Aissue)
 """
 
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else None,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +173,7 @@ Respond with this exact JSON structure (no markdown fences):
 }}"""
 
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=LLM_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
@@ -187,7 +193,7 @@ Respond with this exact JSON structure (no markdown fences):
 
 def get_embedding(text: str) -> list[float]:
     response = openai_client.embeddings.create(
-        model="text-embedding-3-small",
+        model=EMBEDDING_MODEL,
         input=text[:8000],
     )
     return response.data[0].embedding

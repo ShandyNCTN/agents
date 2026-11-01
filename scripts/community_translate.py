@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-3.8-flash")
 REPO = os.environ["REPO_FULL_NAME"]
 EVENT_NAME = os.environ.get("EVENT_NAME", "")
 LABEL_NAME = os.environ.get("LABEL_NAME", "")
@@ -59,7 +61,10 @@ TARGET_LANGUAGES = {
 # Docs files to translate
 DOCS_TO_TRANSLATE = ["README.md", "CONTRIBUTING.md"]
 
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else None,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +172,7 @@ Document to translate:
 {text}"""
 
     response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=LLM_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
