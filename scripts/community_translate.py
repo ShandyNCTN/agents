@@ -16,6 +16,7 @@ Handles three responsibilities:
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 
@@ -89,8 +90,14 @@ def git(*args) -> str:
 
 
 # ---------------------------------------------------------------------------
-# First-time contributor welcome
+# Contributor Lint & Onboarding Mentor
 # ---------------------------------------------------------------------------
+
+CONVENTIONAL_COMMIT_REGEX = re.compile(
+    r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+    r"(\([a-zA-Z0-9_\-\./\s]+\))?(!)?:\s.+"
+)
+
 
 def is_first_time_contributor(username: str) -> bool:
     """Check if the user has any previously merged PRs in this repo."""
@@ -110,34 +117,173 @@ def is_first_time_contributor(username: str) -> bool:
         return True
 
 
-def post_welcome_comment(pr_num: int, author: str) -> None:
-    welcome_body = f"""👋 Hi @{author}! Welcome and thank you for opening your first pull request! 🎉
+def get_contributor_profile(username: str) -> dict:
+    """Fetch contributor public profile info to infer location and language preference."""
+    try:
+        user_data = gh_get(f"/users/{username}")
+        if isinstance(user_data, dict):
+            return {
+                "name": user_data.get("name"),
+                "location": user_data.get("location"),
+                "bio": user_data.get("bio"),
+                "company": user_data.get("company"),
+            }
+    except Exception as exc:
+        log.warning("Could not fetch user profile for %s: %s", username, exc)
+    return {}
 
-Here are a few quick tips to help your contribution go smoothly:
-- 📖 Please ensure your code follows our [Contributing Guidelines](CONTRIBUTING.md)
-- 🧪 Check that all tests pass and consider adding new tests for your changes
-- 🤖 Our AI PR Reviewer will leave automated feedback shortly to help catch any early issues
-- 💬 Maintainers will review your PR as soon as possible. Feel free to leave questions in this thread
 
-Thank you for helping make this project better! 🚀"""
+def lint_pr_commits(pr_num: int) -> dict:
+    """Check if all PR commits adhere to Conventional Commits."""
+    try:
+        commits = gh_get(f"/repos/{REPO}/pulls/{pr_num}/commits")
+        if not isinstance(commits, list):
+            commits = []
+    except Exception as exc:
+        log.warning("Could not fetch commits for PR #%d: %s", pr_num, exc)
+        commits = []
 
-    gh_post(
-        f"/repos/{REPO}/issues/{pr_num}/comments",
-        {"body": welcome_body},
+    non_conforming = []
+    for c in commits:
+        msg = c.get("commit", {}).get("message", "")
+        subject = msg.splitlines()[0] if msg else ""
+        if not CONVENTIONAL_COMMIT_REGEX.match(subject):
+            non_conforming.append(subject)
+
+    return {
+        "total": len(commits),
+        "non_conforming": non_conforming,
+        "is_valid": len(non_conforming) == 0,
+    }
+
+
+def check_branch_sync(pr: dict) -> dict:
+    """Check if the PR branch is up to date with base."""
+    if not isinstance(pr, dict):
+        return {"behind_by": 0, "ahead_by": 0, "base_ref": "main"}
+
+    base_ref = pr.get("base", {}).get("ref", "main")
+    head_sha = pr.get("head", {}).get("sha", "")
+    if not head_sha:
+        return {"behind_by": 0, "ahead_by": 0, "base_ref": base_ref}
+
+    try:
+        compare_data = gh_get(f"/repos/{REPO}/compare/{base_ref}...{head_sha}")
+        behind_by = compare_data.get("behind_by", 0) if isinstance(compare_data, dict) else 0
+        ahead_by = compare_data.get("ahead_by", 0) if isinstance(compare_data, dict) else 0
+        return {"behind_by": behind_by, "ahead_by": ahead_by, "base_ref": base_ref}
+    except Exception as exc:
+        log.warning("Could not compare branches for PR: %s", exc)
+        return {"behind_by": 0, "ahead_by": 0, "base_ref": base_ref}
+
+
+def generate_mentor_comment(
+    author: str,
+    pr_num: int,
+    pr_title: str,
+    pr_body: str,
+    is_first_time: bool,
+    profile: dict,
+    commit_lint: dict,
+    sync_status: dict,
+) -> str:
+    """Use GPT to generate an empathetic, localized onboarding mentor comment."""
+    system = load_system_prompt()
+    user_context = f"""Contributor: @{author}
+First-time contributor: {is_first_time}
+Profile Location: {profile.get('location') or 'Not specified'}
+Profile Bio: {profile.get('bio') or 'Not specified'}
+PR #{pr_num}: {pr_title}
+PR Description: {(pr_body or '')[:500]}
+
+Commit Hygiene:
+- Total commits: {commit_lint['total']}
+- Valid Conventional Commits: {commit_lint['is_valid']}
+- Non-conforming commits: {commit_lint['non_conforming']}
+
+Branch Sync Status:
+- Base branch: {sync_status.get('base_ref', 'main')}
+- Behind base by: {sync_status.get('behind_by', 0)} commits
+"""
+
+    prompt = f"""You are the Contributor Onboarding Mentor for this open source repository.
+Review the following contributor profile and PR state:
+{user_context}
+
+Instructions:
+1. Detect contributor's preferred language based on their profile location, bio, or PR description (e.g. Indonesian if location is Indonesia/Jakarta, Spanish for Spain/Latin America, Chinese for China/Taiwan, Japanese for Japan, or English as global default).
+2. Write a warm, encouraging mentorship comment in their preferred language.
+3. Structure:
+   - Friendly greeting & thank them for opening PR #{pr_num} (celebrate enthusiastically if first-time contributor!).
+   - Commit message hygiene review:
+     * If all commits match Conventional Commits, praise them.
+     * If any commit does not match, politely explain why Conventional Commits matter and give a clear example.
+   - Branch status:
+     * If behind base branch ({sync_status.get('base_ref')}), kindly explain how to update with git rebase commands.
+     * If up to date, confirm it.
+   - Next steps: reassuring closing note that CI and reviewers are here to help.
+
+Output ONLY the markdown comment text (no markdown wrapping fences around the whole response)."""
+
+    response = openai_client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+        max_tokens=1500,
     )
-    log.info("Posted welcome comment to PR #%d for @%s", pr_num, author)
+    raw = response.choices[0].message.content or ""
+    return raw.strip()
 
 
 def handle_pull_request() -> None:
     if not PR_NUMBER or not PR_AUTHOR:
-        log.info("Missing PR context, skipping welcome")
+        log.info("Missing PR context, skipping contributor onboarding mentor")
         return
 
     pr_num = int(PR_NUMBER)
-    if is_first_time_contributor(PR_AUTHOR):
-        post_welcome_comment(pr_num, PR_AUTHOR)
-    else:
-        log.info("Author @%s is a returning contributor; skipping welcome comment.", PR_AUTHOR)
+    first_time = is_first_time_contributor(PR_AUTHOR)
+    profile = get_contributor_profile(PR_AUTHOR)
+
+    pr_raw = {}
+    try:
+        pr_raw = gh_get(f"/repos/{REPO}/pulls/{pr_num}")
+    except Exception as exc:
+        log.warning("Could not fetch PR data for #%d: %s", pr_num, exc)
+
+    pr_data = pr_raw if isinstance(pr_raw, dict) else {}
+    pr_title = str(pr_data.get("title", ""))
+    pr_body = str(pr_data.get("body", ""))
+
+    commit_lint = lint_pr_commits(pr_num)
+    sync_status = check_branch_sync(pr_data)
+
+    log.info(
+        "Mentoring @%s: first_time=%s, commit_valid=%s, behind_by=%d",
+        PR_AUTHOR,
+        first_time,
+        commit_lint["is_valid"],
+        sync_status.get("behind_by", 0),
+    )
+
+    comment_body = generate_mentor_comment(
+        author=PR_AUTHOR,
+        pr_num=pr_num,
+        pr_title=pr_title,
+        pr_body=pr_body,
+        is_first_time=first_time,
+        profile=profile,
+        commit_lint=commit_lint,
+        sync_status=sync_status,
+    )
+
+    gh_post(
+        f"/repos/{REPO}/issues/{pr_num}/comments",
+        {"body": comment_body},
+    )
+    log.info("Posted onboarding mentorship comment to PR #%d for @%s", pr_num, PR_AUTHOR)
 
 
 # ---------------------------------------------------------------------------

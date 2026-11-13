@@ -10,11 +10,39 @@
 
 | Agent | Workflow | Script | Trigger | Capabilities |
 |-------|----------|--------|---------|--------------|
-| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | Categorise labels (`bug`, `enhancement`, `documentation`, `question`), detect duplicate issues via cosine embeddings similarity, answer questions with FAQ links |
-| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | Analyse unified diff for bugs, security holes, style violations, performance issues; post structured review comment; warn on missing tests |
-| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | Detect documentation drift from commits; generate structured markdown changelogs from merged PRs, update `CHANGELOG.md`, update GitHub release body |
-| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | Fetch failed step logs from GitHub Actions run zip, diagnose root cause via GPT, post comment on PR or create tracking issue with actionable fix |
-| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | Translate docs to 5 languages (`id`, `zh`, `ja`, `es`, `ar`), welcome first-time contributors on their first PR |
+| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | Categorise labels (`bug`, `enhancement`, `documentation`, `question`), detect duplicate issues via cosine embeddings similarity, answer questions with FAQ links, **smart severity scoring** (`low`, `medium`, `high`, `critical`) with automatic `sla:24h` SLA labels, and **Automated Bug Reproduction Harness (MRE)** synthesizer with 1-command verification. |
+| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | Unified diff review for bugs, style, and performance; **Static Security Engine** scanning diff for hardcoded secrets/tokens/JWTs/DB URIs/SQLi/path traversal/eval/exec; **Auto-Test Generator** synthesizing complete runnable `pytest`/`unittest` test suites for untested changes. |
+| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | Detect documentation drift from commits; generate structured markdown changelogs from merged PRs, update `CHANGELOG.md` & GitHub release body; **Semantic Breaking Changes & Migration Guide** detecting deleted/renamed public APIs and signature changes with Before/After migration guides. |
+| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | Fetch failed step logs from GitHub Actions run zip, diagnose root cause via LLM; **Real Auto-Heal PR** that automatically branches (`auto-fix/ci-run-<id>`), commits targeted file fix, and opens a Pull Request with diagnosis and fix explanation. |
+| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | Translate docs to 5 languages (`id`, `zh`, `ja`, `es`, `ar`); **Contributor Lint & Onboarding Mentor** checking PR commit messages against Conventional Commits, verifying branch sync, and delivering empathetic personalized mentorship in contributor's native language. |
+
+---
+
+## 🌟 Advanced Superpowers
+
+### 1. Automated Bug Reproduction Harness (Issue Triage)
+When a bug report is filed, the triage agent analyzes stack traces and code snippets to synthesize a standalone, runnable reproduction script (`python`, `javascript`, or `sh`) and posts it directly to the issue:
+```bash
+# 🤖 Automated Bug Reproduction Harness
+# Run with one command:
+python repro.py
+```
+Critical bugs automatically receive `severity:critical` and `sla:24h` labels for expedited incident response.
+
+### 2. Auto-Test Generator & Security Rule Engine (PR Reviewer)
+- **Static Security Engine**: Diff additions are pre-scanned against patterns for API keys, OpenAI/GitHub/AWS tokens, JWT secrets, DB connection strings, SQL injection strings, directory traversal, and dynamic `eval`/`exec`.
+- **Auto-Test Generator**: If code changes lack unit tests, the reviewer generates a complete, copy-pasteable `pytest` or `unittest` test suite covering the new logic and edge cases.
+
+### 3. Semantic Breaking Changes & Migration Guide (Docs & Release)
+Automatically identifies breaking changes across merged pull requests (renamed/deleted APIs, altered function signatures, modified environment variables) and generates a dedicated `### ⚠️ Breaking Changes & Migration Guide` in `CHANGELOG.md` with step-by-step Before/After migration examples.
+
+### 4. Real Auto-Heal PRs (CI Debugger)
+When a CI workflow fails, the CI debugger diagnoses the failure and—for targeted, fixable errors (dependency pins, typos, syntax issues, broken imports)—creates a dedicated branch (`auto-fix/ci-run-<run_id>`), commits the fix using the GitHub API, and opens a Pull Request ready for review.
+
+### 5. Contributor Lint & Onboarding Mentor (Community & Translation)
+- **Conventional Commits Lint**: Inspects all commit subjects in the PR against conventional commit standards (`feat:`, `fix:`, `docs:`, `chore:`, etc.).
+- **Branch Sync Check**: Compares the PR branch against the target branch and warns if it has fallen behind.
+- **Localized Mentorship**: Detects the contributor's primary language from profile location/bio or PR content and delivers warm, localized mentorship and onboarding guidance.
 
 ---
 

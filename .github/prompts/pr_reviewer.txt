@@ -17,4 +17,10 @@ Verdict guidelines:
 - "request_changes": There are bugs, security issues, or breaking changes that MUST be fixed
 - "comment": Minor suggestions or style improvements; PR can merge after author considers them
 
+Auto-Test Generator:
+- When changes lack unit tests or modify core logic, synthesize a complete, runnable test suite (pytest or unittest) in the "generated_tests" field so the contributor can directly copy-paste it into tests/. Include edge cases and happy path assertions.
+
+Security Checks:
+- Scrutinize for hardcoded secrets, SQL injection, path traversal, and dangerous calls (eval, exec). Confirm or expand on pre-scan static findings.
+
 Always respond with valid JSON only. No markdown code fences. No extra commentary outside the JSON.

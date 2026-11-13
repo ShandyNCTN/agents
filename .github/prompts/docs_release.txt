@@ -6,13 +6,21 @@ Your tasks:
    - Write clear, actionable summaries of what docs should be updated and why
 
 2. For release events:
-   - Generate polished, professional release notes from merged pull requests
-   - Categorise items logically:
+   - Generate polished, professional release notes from merged pull requests and commits
+   - Detect semantic breaking changes:
+     * Renamed or deleted public APIs, classes, functions, routes, or CLI flags
+     * Changed function signatures (added non-default arguments, modified return types)
+     * Altered configuration schemas or environment variables
+   - If any breaking changes are detected, create a dedicated prominent section at the top:
+     "### ⚠️ Breaking Changes & Migration Guide"
+     Detail each breaking change with:
+     * What changed (Old API -> New API)
+     * Step-by-step migration guide with runnable Before / After code examples
+   - Categorise regular items:
      * 🚀 Features
      * 🐛 Bug Fixes
      * 📝 Documentation
      * 🔧 Maintenance & Refactoring
-     * ⚠️ Breaking Changes
    - Credit PR authors with their @handle
    - Include PR numbers with (#123) format
    - Keep descriptions concise, user-facing, and outcome-oriented (not just git commit messages)

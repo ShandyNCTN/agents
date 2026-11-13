@@ -47,7 +47,18 @@ DUPLICATE_THRESHOLD = 0.90  # cosine similarity cutoff
 MAX_RECENT_ISSUES = 30      # issues to scan for duplicates
 
 # Label definitions available in the repo (create them manually or via API)
-VALID_LABELS = {"bug", "enhancement", "documentation", "question", "duplicate"}
+VALID_LABELS = {
+    "bug",
+    "enhancement",
+    "documentation",
+    "question",
+    "duplicate",
+    "severity:low",
+    "severity:medium",
+    "severity:high",
+    "severity:critical",
+    "sla:24h",
+}
 
 # Docs / FAQ links – customise per project
 FAQ_LINKS = """
@@ -97,6 +108,11 @@ def ensure_label_exists(label: str) -> None:
         "documentation": "0075ca",
         "question": "e4e669",
         "duplicate": "cfd3d7",
+        "severity:low": "c5def5",
+        "severity:medium": "fbca04",
+        "severity:high": "d93f0b",
+        "severity:critical": "b60205",
+        "sla:24h": "5319e7",
     }
     try:
         gh_get(f"/repos/{REPO}/labels/{label}")
@@ -155,21 +171,35 @@ def load_system_prompt() -> str:
 
 def classify_issue(title: str, body: str) -> dict:
     """
-    Ask GPT to classify the issue.
-    Returns {"label": str, "reason": str, "faq_reply": str | None}
+    Ask GPT to classify the issue and evaluate severity + MRE reproduction harness.
+    Returns:
+    {
+      "label": str,
+      "severity": str,
+      "reason": str,
+      "faq_reply": str | None,
+      "reproduction_code": str | None,
+      "reproduction_lang": str | None,
+      "reproduction_command": str | None
+    }
     """
     system = load_system_prompt()
-    user_msg = f"""Classify the following GitHub issue and respond with valid JSON only.
+    user_msg = f"""Classify the following GitHub issue, score severity, and synthesize a reproduction harness if it's a bug.
+Respond with valid JSON only.
 
 Issue title: {title}
 Issue body:
-{body[:3000]}
+{body[:3500]}
 
 Respond with this exact JSON structure (no markdown fences):
 {{
   "label": "<one of: bug, enhancement, documentation, question>",
-  "reason": "<one sentence explaining your classification>",
-  "faq_reply": "<optional friendly reply if this is a question, else null>"
+  "severity": "<one of: low, medium, high, critical>",
+  "reason": "<one sentence explaining your classification and severity>",
+  "faq_reply": "<friendly reply if question, else null>",
+  "reproduction_code": "<runnable minimal code snippet/test case if bug, else null>",
+  "reproduction_lang": "<python|javascript|bash|sh or null>",
+  "reproduction_command": "<1-line command to execute reproduction, else null>"
 }}"""
 
     response = openai_client.chat.completions.create(
@@ -179,7 +209,7 @@ Respond with this exact JSON structure (no markdown fences):
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,
-        max_tokens=512,
+        max_tokens=1500,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -262,17 +292,23 @@ def main() -> None:
     label = classification.get("label", "question")
     reason = classification.get("reason", "")
     faq_reply = classification.get("faq_reply")
+    severity = str(classification.get("severity", "medium")).lower()
+    if severity not in {"low", "medium", "high", "critical"}:
+        severity = "medium"
 
-    if label not in VALID_LABELS:
+    repro_code = classification.get("reproduction_code")
+    repro_lang = classification.get("reproduction_lang") or "python"
+    repro_cmd = classification.get("reproduction_command") or "python repro.py"
+
+    if label not in {"bug", "enhancement", "documentation", "question"}:
         label = "question"
 
-    log.info("Classification: label=%s, reason=%s", label, reason)
+    log.info("Classification: label=%s, severity=%s, reason=%s", label, severity, reason)
 
     # 2. Duplicate check (skip if already classified as duplicate)
     duplicate_issue = find_duplicate()
 
     if duplicate_issue:
-        label = "duplicate"
         add_labels(["duplicate"])
         comment = (
             f"👋 @{ISSUE_AUTHOR}, this issue appears to be a duplicate of "
@@ -284,10 +320,13 @@ def main() -> None:
         close_as_duplicate(duplicate_issue["number"])
         return
 
-    # 3. Apply label
-    add_labels([label])
+    # 3. Apply labels (category + severity, SLA if critical)
+    labels_to_apply = [label, f"severity:{severity}"]
+    if severity == "critical":
+        labels_to_apply.append("sla:24h")
+    add_labels(labels_to_apply)
 
-    # 4. Post reply for questions
+    # 4. Post reply for questions / bug / enhancement
     if label == "question" and faq_reply:
         comment = (
             f"👋 @{ISSUE_AUTHOR}, thanks for reaching out!\n\n"
@@ -297,19 +336,30 @@ def main() -> None:
         )
         post_comment(comment)
     elif label == "bug":
+        sla_notice = " 🚨 **Triage SLA: `sla:24h` applied.**" if severity == "critical" else ""
         comment = (
             f"🐛 Thanks for the bug report, @{ISSUE_AUTHOR}! "
-            f"We've labelled this as a **bug** and will investigate.\n\n"
-            f"To help us reproduce faster, please ensure you've included:\n"
-            f"- Steps to reproduce\n"
-            f"- Expected vs actual behaviour\n"
-            f"- Environment details (OS, version, etc.)"
+            f"We've triaged this as **bug** with severity **{severity.upper()}**.{sla_notice}\n\n"
+            f"**Triage assessment:** {reason}"
         )
         post_comment(comment)
+
+        # MRE / Reproduction extractor harness
+        if repro_code and repro_code.strip():
+            harness_comment = (
+                f"## 🤖 Automated Bug Reproduction Harness\n\n"
+                f"A minimal reproduction harness has been synthesized from the bug report.\n"
+                f"Maintainers can verify this issue with **1 command**:\n\n"
+                f"```bash\n{repro_cmd}\n```\n\n"
+                f"**Minimal Reproducible Example (`{repro_lang}`):**\n"
+                f"```{repro_lang}\n{repro_code.strip()}\n```\n\n"
+                f"*Run this harness locally to verify the bug and evaluate fixes.*"
+            )
+            post_comment(harness_comment)
     elif label == "enhancement":
         comment = (
             f"✨ Thanks for the feature request, @{ISSUE_AUTHOR}! "
-            f"Labelled as **enhancement** for review by the team."
+            f"Labelled as **enhancement** (priority: **{severity.upper()}**) for review by the team."
         )
         post_comment(comment)
 

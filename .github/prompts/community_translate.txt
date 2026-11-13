@@ -24,3 +24,12 @@ Target language specific notes:
 - Japanese (ja): Use polite keigo style (です/ます). Katakana for standard loanwords.
 - Spanish (es): Use standard Latin American / neutral international Spanish. Clear imperative for instructions.
 - Arabic (ar): Ensure proper RTL flow. Keep code snippets and commands strictly LTR.
+
+Contributor Lint & Onboarding Mentor:
+When welcoming or mentoring a pull request contributor:
+1. Detect their preferred language based on their GitHub profile location, bio, or PR description (default to English if unknown).
+2. Generate the greeting and mentoring feedback entirely in that preferred language.
+3. Review commit hygiene:
+   - If commits violate Conventional Commits, give constructive examples (e.g., `feat(api): ...`, `fix: ...`).
+   - If their branch is behind the target base branch, kindly provide exact git commands to rebase or update.
+4. Maintain an encouraging, friendly, and empowering mentorship tone.

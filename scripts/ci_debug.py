@@ -8,6 +8,7 @@ Triggered by GitHub Actions when any workflow finishes with conclusion 'failure'
 - If diagnosis points to a simple fix (e.g. pinned dependency bump), creates a fix PR
 """
 
+import base64
 import io
 import json
 import logging
@@ -69,6 +70,13 @@ def gh_get(path: str, params: dict | None = None, stream: bool = False) -> reque
 def gh_post(path: str, body: dict) -> dict:
     url = f"{GH_API}{path}"
     resp = requests.post(url, headers=GH_HEADERS, json=body, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def gh_put(path: str, body: dict) -> dict:
+    url = f"{GH_API}{path}"
+    resp = requests.put(url, headers=GH_HEADERS, json=body, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
@@ -197,12 +205,14 @@ Diagnose this failure and respond with valid JSON only (no markdown fences):
   "category": "<one of: dependency|syntax|test_failure|lint|env_or_secret|timeout|other>",
   "root_cause": "<detailed explanation of the root cause>",
   "suggested_fix": "<actionable step-by-step instructions to fix>",
-  "can_auto_fix": false,
-  "fix_file": null,
-  "fix_content": null
+  "can_auto_fix": true|false,
+  "fix_file": "<relative path in repo or null>",
+  "fix_content": "<entire file content with fix applied or null>",
+  "fix_commit_message": "<conventional commit message or null>",
+  "fix_pr_body": "<markdown explanation for PR body or null>"
 }}
 
-Set can_auto_fix to true ONLY if the fix is trivial (e.g. updating a package version in requirements.txt or fixing a single typo in a config file). Otherwise false."""
+Set can_auto_fix to true whenever the failure can be resolved with a concrete file change (e.g. fixing a typo, updating requirements, fixing a syntax error, adjusting configuration, fixing an assertion). Provide the complete updated file in fix_content."""
 
     response = openai_client.chat.completions.create(
         model=LLM_MODEL,
@@ -211,7 +221,7 @@ Set can_auto_fix to true ONLY if the fix is trivial (e.g. updating a package ver
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,
-        max_tokens=1024,
+        max_tokens=2500,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -226,7 +236,7 @@ Set can_auto_fix to true ONLY if the fix is trivial (e.g. updating a package ver
 # Post diagnosis
 # ---------------------------------------------------------------------------
 
-def format_diagnosis(analysis: dict) -> str:
+def format_diagnosis(analysis: dict, fix_pr: dict | None = None) -> str:
     category_icons = {
         "dependency": "📦",
         "syntax": "⚠️",
@@ -237,6 +247,15 @@ def format_diagnosis(analysis: dict) -> str:
         "other": "🔍",
     }
     icon = category_icons.get(analysis.get("category", "other"), "🔍")
+
+    fix_pr_section = ""
+    if fix_pr and fix_pr.get("html_url"):
+        pr_url = fix_pr["html_url"]
+        pr_num = fix_pr.get("number")
+        fix_pr_section = f"""### 🛠️ Real Auto-Heal Pull Request
+An automated patch was generated, committed, and submitted to fix this failure:
+👉 **[PR #{pr_num}: {fix_pr.get('title', 'Auto-Heal PR')}]({pr_url})**
+"""
 
     return f"""## 🚨 CI Failure Diagnosis
 
@@ -252,12 +271,12 @@ def format_diagnosis(analysis: dict) -> str:
 ### Suggested Fix
 {analysis.get('suggested_fix', 'Inspect the full logs linked above.')}
 
----
+{fix_pr_section}---
 *Diagnosed automatically by [CI Debugger Agent](../../.github/workflows/ci-debug.yml)*"""
 
 
-def post_results(analysis: dict) -> None:
-    body = format_diagnosis(analysis)
+def post_results(analysis: dict, fix_pr: dict | None = None) -> None:
+    body = format_diagnosis(analysis, fix_pr)
 
     # Check if this run belongs to a PR
     try:
@@ -284,23 +303,109 @@ def post_results(analysis: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Auto-fix PR (for simple fixes)
+# Auto-fix PR
 # ---------------------------------------------------------------------------
 
-def try_create_fix_pr(analysis: dict) -> None:
-    """Create a PR if GPT identified a simple safe fix."""
+def try_create_fix_pr(analysis: dict) -> dict | None:
+    """Create a real branch, commit targeted fix, and open PR if GPT generated an auto-fix."""
     if not analysis.get("can_auto_fix"):
-        return
+        return None
 
     fix_file = analysis.get("fix_file")
     fix_content = analysis.get("fix_content")
     if not fix_file or not fix_content:
-        return
+        log.info("Auto-fix flagged but missing fix_file or fix_content")
+        return None
 
-    log.info("Attempting auto-fix for %s", fix_file)
-    # ponytail: apply auto-fix branch and create real PR; skipped when git branch creation from actions needs higher token scopes
-    # We will log the suggestion instead of blindly committing
-    log.info("Auto-fix candidate: %s with content: %s", fix_file, fix_content[:100])
+    log.info("Attempting auto-heal branch and PR creation for %s", fix_file)
+    branch_name = f"auto-fix/ci-run-{FAILED_RUN_ID}"
+
+    # 1. Resolve base commit SHA
+    base_sha = HEAD_SHA
+    if not base_sha:
+        try:
+            ref_resp = gh_get(f"/repos/{REPO}/git/ref/heads/{HEAD_BRANCH}").json()
+            base_sha = ref_resp["object"]["sha"]
+        except Exception:
+            try:
+                repo_info = gh_get(f"/repos/{REPO}").json()
+                default_branch = repo_info.get("default_branch", "main")
+                ref_resp = gh_get(f"/repos/{REPO}/git/ref/heads/{default_branch}").json()
+                base_sha = ref_resp["object"]["sha"]
+            except Exception as e:
+                log.error("Could not determine base SHA for branch creation: %s", e)
+                return None
+
+    # 2. Create git branch
+    try:
+        gh_post(
+            f"/repos/{REPO}/git/refs",
+            {"ref": f"refs/heads/{branch_name}", "sha": base_sha},
+        )
+        log.info("Created branch %s at %s", branch_name, base_sha[:7])
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 422:
+            log.info("Branch %s already exists, reusing branch", branch_name)
+        else:
+            log.error("Failed to create branch %s: %s", branch_name, e)
+            return None
+
+    # 3. Fetch existing file SHA if file already exists on this branch
+    existing_sha = None
+    try:
+        file_info = gh_get(f"/repos/{REPO}/contents/{fix_file}", params={"ref": branch_name}).json()
+        existing_sha = file_info.get("sha")
+    except Exception:
+        log.info("Target file %s does not exist on branch %s; creating new file", fix_file, branch_name)
+
+    # 4. Commit updated content
+    commit_msg = analysis.get("fix_commit_message") or f"fix(ci): auto-heal workflow failure in run #{FAILED_RUN_ID}"
+    b64_content = base64.b64encode(fix_content.encode("utf-8")).decode("ascii")
+
+    put_body = {
+        "message": commit_msg,
+        "content": b64_content,
+        "branch": branch_name,
+    }
+    if existing_sha:
+        put_body["sha"] = existing_sha
+
+    try:
+        gh_put(f"/repos/{REPO}/contents/{fix_file}", put_body)
+        log.info("Committed auto-fix to %s on branch %s", fix_file, branch_name)
+    except Exception as e:
+        log.error("Failed to commit auto-fix to %s: %s", fix_file, e)
+        return None
+
+    # 5. Open Pull Request
+    pr_title = f"fix(ci): auto-heal workflow failure in run #{FAILED_RUN_ID}"
+    pr_body = analysis.get("fix_pr_body")
+    if not pr_body:
+        pr_body = (
+            f"## 🤖 Automated CI Auto-Heal Fix\n\n"
+            f"This Pull Request was automatically generated by the **CI Debugger Agent** "
+            f"to resolve a build failure in workflow `{FAILED_WORKFLOW_NAME}` (Run [#{FAILED_RUN_ID}](https://github.com/{REPO}/actions/runs/{FAILED_RUN_ID})).\n\n"
+            f"### Root Cause\n{analysis.get('root_cause', 'Unknown')}\n\n"
+            f"### Fix Summary\n{analysis.get('suggested_fix', 'Applied automated fix.')}\n\n"
+            f"**Modified File:** `{fix_file}`\n\n"
+            f"---\n*Please review and merge once CI tests pass.*"
+        )
+
+    try:
+        pr_resp = gh_post(
+            f"/repos/{REPO}/pulls",
+            {
+                "title": pr_title,
+                "head": branch_name,
+                "base": HEAD_BRANCH,
+                "body": pr_body,
+            },
+        )
+        log.info("Opened auto-heal PR #%s: %s", pr_resp.get("number"), pr_resp.get("html_url"))
+        return pr_resp
+    except requests.HTTPError as e:
+        log.error("Failed to open auto-heal PR: %s", e)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -318,8 +423,8 @@ def main() -> None:
     analysis = analyze_failure(logs)
     log.info("Analysis complete: category=%s", analysis.get("category"))
 
-    post_results(analysis)
-    try_create_fix_pr(analysis)
+    fix_pr = try_create_fix_pr(analysis)
+    post_results(analysis, fix_pr)
 
 
 if __name__ == "__main__":

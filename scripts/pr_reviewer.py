@@ -11,6 +11,7 @@ Triggered by GitHub Actions on PR open/synchronize.
 import json
 import logging
 import os
+import re
 import sys
 
 import requests
@@ -140,6 +141,75 @@ def has_source_changes(files: list[dict]) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Static security rule engine
+# ---------------------------------------------------------------------------
+
+SECURITY_PATTERNS = [
+    (
+        r"(?i)(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*['\"][a-zA-Z0-9_\-\.]{16,}['\"]",
+        "Hardcoded API / secret key",
+        "Move secret to environment variables or GitHub Secrets repository store.",
+    ),
+    (
+        r"(?:sk-[a-zA-Z0-9]{20,}|gh[pousr]-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16})",
+        "Exposed provider credential token (OpenAI/GitHub/AWS)",
+        "Revoke immediately and inject via environment secrets.",
+    ),
+    (
+        r"(?i)(?:jwt[_-]?secret|jwt[_-]?key)\s*[:=]\s*['\"][^'\"]+['\"]|eyJ[A-Za-z0-9-_=]{10,}\.[A-Za-z0-9-_=]{10,}\.[A-Za-z0-9-_.+/=]*",
+        "Hardcoded JWT secret or token",
+        "Load JWT secrets strictly from environment variables.",
+    ),
+    (
+        r"(?i)(?:postgres|postgresql|mysql|mongodb|redis|amqp|mssql):\/\/[^\s:'\"]+:[^\s@'\"]+@[^\s'\"]+",
+        "Hardcoded database connection URI with credentials",
+        "Use DATABASE_URL from environment variables instead of committing credentials.",
+    ),
+    (
+        r"(?i)(?:execute|cursor\.execute|raw|query)\s*\(\s*(?:f['\"]|['\"].*%s|.*\+.*SELECT|.*\.format\()",
+        "Potential SQL injection via string formatting",
+        "Use parameterized queries with placeholder binding (e.g. cursor.execute(query, (param,)))",
+    ),
+    (
+        r"(?:\.\.[\/\\]|\bos\.path\.join\([^)]*\.\.)",
+        "Potential path traversal (relative directory traversal)",
+        "Sanitize paths with os.path.basename or validate against an allowed base directory.",
+    ),
+    (
+        r"\b(?:eval|exec)\s*\(",
+        "Dangerous dynamic code execution (eval/exec)",
+        "Replace eval/exec with safe alternatives like ast.literal_eval or structured dispatch.",
+    ),
+]
+
+
+def scan_security_rules(diff: str) -> list[dict]:
+    """
+    Explicit static security scan on added lines in diff before LLM call.
+    """
+    findings = []
+    added_lines = [
+        line[1:].strip()
+        for line in diff.splitlines()
+        if line.startswith("+") and not line.startswith("+++")
+    ]
+
+    for pattern, name, fix in SECURITY_PATTERNS:
+        regex = re.compile(pattern)
+        for line in added_lines:
+            if regex.search(line):
+                findings.append({
+                    "severity": "critical",
+                    "category": "security",
+                    "description": f"Static Security Engine: {name} detected in line: `{line[:90]}`",
+                    "suggestion": fix,
+                })
+                break  # one finding per pattern per diff is sufficient
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # GPT review
 # ---------------------------------------------------------------------------
 
@@ -154,21 +224,37 @@ def load_system_prompt() -> str:
     )
 
 
-def review_diff(diff: str, pr_title: str, pr_body: str) -> dict:
+def review_diff(diff: str, pr_title: str, pr_body: str, missing_tests: bool, static_findings: list[dict]) -> dict:
     """
     Send diff to GPT and get structured review.
-    Returns {"summary": str, "issues": list[dict], "suggestions": list[str], "verdict": str}
+    Returns {"summary": str, "issues": list[dict], "suggestions": list[str], "verdict": str, "generated_tests": str | None}
     """
     system = load_system_prompt()
     truncated = diff[:MAX_DIFF_CHARS]
     if len(diff) > MAX_DIFF_CHARS:
         truncated += f"\n\n[... diff truncated at {MAX_DIFF_CHARS} chars ...]"
 
+    static_context = ""
+    if static_findings:
+        static_context = "\nPre-scan static security engine detected these critical issues:\n" + "\n".join(
+            f"- {f['description']} (Suggestion: {f['suggestion']})" for f in static_findings
+        )
+
+    test_generation_instruction = ""
+    if missing_tests:
+        test_generation_instruction = (
+            "\nNOTE: This PR introduces or alters logic without unit test files. "
+            "You MUST synthesize a complete, runnable test suite (pytest or unittest) "
+            "covering the changed logic and edge cases in the 'generated_tests' field."
+        )
+
     user_msg = f"""Review the following pull request diff.
 
 PR Title: {pr_title}
 PR Description:
 {pr_body[:1000]}
+{static_context}
+{test_generation_instruction}
 
 Diff:
 ```diff
@@ -187,7 +273,8 @@ Respond with valid JSON only (no markdown fences):
     }}
   ],
   "suggestions": ["<general improvement suggestion>"],
-  "verdict": "<approve|request_changes|comment>"
+  "verdict": "<approve|request_changes|comment>",
+  "generated_tests": "<complete runnable pytest/unittest code or null>"
 }}
 
 Be constructive. Prefer 'comment' verdict unless there are real bugs or security issues."""
@@ -199,7 +286,7 @@ Be constructive. Prefer 'comment' verdict unless there are real bugs or security
             {"role": "user", "content": user_msg},
         ],
         temperature=0.3,
-        max_tokens=2048,
+        max_tokens=2500,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -251,8 +338,22 @@ def format_review(review: dict, missing_tests: bool) -> str:
         lines += [
             "### ⚠️ Missing Tests",
             "",
-            "This PR modifies source files but does not include test files. "
+            "This PR modifies source files without test files. "
             "Please add or update tests to maintain coverage.",
+            "",
+        ]
+
+    generated_tests = review.get("generated_tests")
+    if generated_tests and generated_tests.strip():
+        lines += [
+            "### 🧪 Auto-Generated Test Suite",
+            "",
+            "The following test suite was automatically generated to help you cover your changes. "
+            "You can copy-paste this into your test suite (e.g. `tests/test_changes.py`):",
+            "",
+            "```python",
+            generated_tests.strip(),
+            "```",
             "",
         ]
 
@@ -283,9 +384,25 @@ def main() -> None:
     missing_tests = has_source_changes(files) and not has_test_files(files)
     log.info("Source changes: %s, Test files included: %s", has_source_changes(files), not missing_tests)
 
-    # GPT review
-    review = review_diff(diff, PR_TITLE, PR_BODY)
-    verdict = review.get("verdict", "comment").upper()
+    # Static security rule engine scan before LLM
+    static_findings = scan_security_rules(diff)
+    if static_findings:
+        log.warning("Static security rule engine detected %d issues", len(static_findings))
+
+    # GPT review with auto-test generation
+    review = review_diff(diff, PR_TITLE, PR_BODY, missing_tests, static_findings)
+
+    # Merge static security findings into issues list
+    existing_issues = review.get("issues", [])
+    existing_descs = {i.get("description") for i in existing_issues}
+    for sf in static_findings:
+        if sf["description"] not in existing_descs:
+            existing_issues.insert(0, sf)
+    review["issues"] = existing_issues
+
+    # If critical issues exist (security/bugs), ensure changes are requested
+    has_critical = any(i.get("severity") == "critical" for i in existing_issues)
+    verdict = "REQUEST_CHANGES" if has_critical else review.get("verdict", "comment").upper()
 
     # Format and post
     comment_body = format_review(review, missing_tests)
