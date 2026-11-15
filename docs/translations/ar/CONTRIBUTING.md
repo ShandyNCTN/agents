@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to **opensource-agents**! We welcome contributions of all kinds: bug reports, feature requests, documentation improvements, and code changes.
 
-Terima kasih atas minat Anda untuk berkontribusi. Kami menerima semua bentuk kontribusi: laporan bug, permintaan fitur, perbaikan dokumentasi, dan kode.
+شكراً لاهتمامك بالمساهمة في **opensource-agents**! نرحب بجميع أنواع المساهمات: تقارير الأخطاء، طلبات الميزات، تحسينات التوثيق، وتعديلات الشفرة البرمجية.
 
 ---
 

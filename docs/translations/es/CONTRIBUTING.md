@@ -1,65 +1,73 @@
-# Guías de Contribución / Contributing Guidelines
+# Contributing Guidelines / Guía de Contribución
 
-Gracias por tu interés en contribuir a **opensource-agents**. Damos la bienvenida a todo tipo de contribuciones: reportes de bugs, solicitudes de nuevas características, mejoras en la documentación y cambios de código.
+Thank you for your interest in contributing to **opensource-agents**! We welcome contributions of all kinds: bug reports, feature requests, documentation improvements, and code changes.
 
-Terima kasih atas minat Anda untuk berkontribusi. Kami menerima semua bentuk kontribusi: laporan bug, permintaan fitur, perbaikan dokumentasi, dan kode.
+Gracias por tu interés en contribuir a **opensource-agents**. Damos la bienvenida a todo tipo de contribuciones: reportes de bugs, solicitudes de funciones, mejoras en la documentación y cambios de código.
 
 ---
 
-## Código de Conducta
+## Code of Conduct / Código de Conducta
+
+- Be welcoming, inclusive, and respectful to all contributors.
+- Keep discussions constructive and focused on the technical work.
+- Harassment or discrimination of any form will not be tolerated.
 
 - Sé acogedor, inclusivo y respetuoso con todos los colaboradores.
-- Mantén las discusiones constructivas y enfocadas en el trabajo técnico.
-- No se tolerará ninguna forma de acoso o discriminación.
+- Mantén las discusiones constructivas y centradas en el trabajo técnico.
+- No se tolerará el acoso ni la discriminación de ningún tipo.
 
 ---
 
-## Cómo Contribuir
+## How to Contribute / Cómo Contribuir
 
-### 1. Reportar Issues
+### 1. Reporting Issues / Reportar Problemas
+- Check existing issues before opening a new one to avoid duplicates.
+- Use clear, descriptive titles.
+- For bug reports, include steps to reproduce, expected vs actual behavior, and system details.
+
 - Revisa los issues existentes antes de abrir uno nuevo para evitar duplicados.
 - Utiliza títulos claros y descriptivos.
 - Para los reportes de bugs, incluye los pasos para reproducir, el comportamiento esperado frente al real y los detalles del sistema.
 
 ### 2. Pull Requests
-1. Haz un fork del repositorio y crea tu rama desde `main`:
+1. Fork the repository and create your branch from `main`:
    ```bash
    git checkout -b feature/your-feature-name
    ```
-2. Instala las dependencias:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Realiza tus cambios:
-   - Sigue las convenciones PEP 8 para los scripts de Python.
-   - Incluye docstrings y anotaciones de tipos donde sea razonable.
-   - Si modificas scripts, asegúrate de implementar un manejo de errores y logging adecuados.
-   - Mantén los workflows de YAML válidos y utiliza controles de concurrencia.
-4. Prueba localmente antes de hacer push:
+3. Make your changes:
+   - Follow PEP 8 conventions for Python scripts.
+   - Include docstrings and type annotations where sensible.
+   - If modifying scripts, ensure proper error handling and logging.
+   - Keep YAML workflows valid and use concurrency controls.
+4. Test locally before pushing:
    ```bash
    # Syntax check all scripts
    python -m py_compile scripts/*.py
    ```
-5. Haz commit con mensajes descriptivos (ej. `feat: add retry logic to pr_reviewer.py`).
-6. Haz push a tu fork y envía un pull request dirigido a `main`.
+5. Commit with descriptive messages (e.g. `feat: add retry logic to pr_reviewer.py`).
+6. Push to your fork and submit a pull request against `main`.
 
 ---
 
-## Pautas de Desarrollo
+## Development Guidelines / Directrices de Desarrollo
 
-- **Agentes de IA**: Los scripts utilizan la sintaxis de `openai` v1+ y apuntan a `gpt-4o-mini` para mantener los costos de la API al mínimo.
-- **Prompts**: Almacena los system prompts en `.github/prompts/<agent_name>.txt` en lugar de incrustar cadenas largas de texto en el código de Python.
-- **Secrets**: NUNCA hagas commit de API keys o tokens. Todos los scripts deben leer los secrets a través de variables de entorno.
+- **AI Agents**: Scripts use `openai` v1+ syntax and target `gpt-4o-mini` to keep API costs minimal.
+- **Prompts**: Store system prompts in `.github/prompts/<agent_name>.txt` rather than embedding long strings in Python code.
+- **Secrets**: NEVER commit API keys or tokens. All scripts must read secrets via environment variables.
 
 ---
 
-## Traductores
+## Translations / Traducciones
 
-Mantenemos traducciones comunitarias para los archivos de documentación en `docs/translations/`:
-- `id` — Indonesio (Bahasa Indonesia)
-- `zh` — Chino simplificado (简体中文)
-- `ja` — Japonés (日本語)
-- `es` — Español (Español)
-- `ar` — Árabe (العربية)
+We maintain community translations for documentation files in `docs/translations/`:
+- `id` — Indonesian (Bahasa Indonesia)
+- `zh` — Simplified Chinese (简体中文)
+- `ja` — Japanese (日本語)
+- `es` — Spanish (Español)
+- `ar` — Arabic (العربية)
 
-Para activar actualizaciones de traducción automatizadas, etiqueta un issue con `translate` o ejecuta el workflow manualmente a través de GitHub Actions.
+To trigger automated translation updates, label an issue with `translate` or run the workflow manually via GitHub Actions.

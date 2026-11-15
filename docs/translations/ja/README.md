@@ -1,24 +1,52 @@
 # Open Source AI Agents for GitHub
 
-> OpenAI GPT-4o-mini を活用した 5 つの自律型 GitHub Actions エージェントにより、オープンソースプロジェクトの管理を効率化します。Issue のトリアージ、PR のレビュー、ドキュメントの同期、CI 失敗のデバッグ、多言語コミュニティ翻訳を行います。
+> 5 autonomous GitHub Actions agents powered by OpenAI GPT-4o-mini to streamline open-source project management: issue triage, PR review, documentation sync, CI failure debugging, and multi-language community translation.
 
-*Sistem otomasi 5 agent GitHub Actions bertenaga OpenAI GPT-4o-mini untuk mempermudah pengelolaan proyek open-source: triage issue, review PR, sinkronisasi dokumentasi & rilis, diagnosis kegagalan CI, dan penerjemahan komunitas multi-bahasa.*
+*OpenAI GPT-4o-mini を搭載した 5 つの自律型 GitHub Actions エージェントにより、オープンソースプロジェクトの管理を効率化します。イシューのトリアージ、PR レビュー、ドキュメント・リリースの同期、CI 失敗の診断、多言語コミュニティ翻訳を行います。*
 
 ---
 
-## 🤖 5 つのエージェント
+## 🤖 The 5 Agents
 
-| エージェント | ワークフロー | スクリプト | トリガー | 機能 |
+| Agent | Workflow | Script | Trigger | Capabilities |
 |-------|----------|--------|---------|--------------|
-| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | ラベルの分類 (`bug`、`enhancement`、`documentation`、`question`)、コサイン類似度埋め込みによる重複 Issue の検出、FAQ リンク付きの質問への回答 |
-| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | バグ、セキュリティ上の脆弱性、スタイル違反、パフォーマンス問題に関する統一 diff の解析。構造化されたレビューコメントの投稿。テストの不足に対する警告 |
-| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | コミットからのドキュメント乖離の検出。マージされた PR から構造化されたマークダウンの変更履歴を生成し、`CHANGELOG.md` および GitHub リリースの本文を更新 |
-| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | GitHub Actions 実行 zip から失敗したステップのログを取得し、GPT を通じて根本原因を診断。PR へのコメント投稿、または実行可能な修正を含む追跡用 Issue の作成 |
-| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | ドキュメントを 5 言語 (`id`、`zh`、`ja`、`es`、`ar`) に翻訳。初めて PR を作成するコントリビューターを歓迎 |
+| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | Categorise labels (`bug`, `enhancement`, `documentation`, `question`), detect duplicate issues via cosine embeddings similarity, answer questions with FAQ links, **smart severity scoring** (`low`, `medium`, `high`, `critical`) with automatic `sla:24h` SLA labels, and **Automated Bug Reproduction Harness (MRE)** synthesizer with 1-command verification. |
+| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | Unified diff review for bugs, style, and performance; **Static Security Engine** scanning diff for hardcoded secrets/tokens/JWTs/DB URIs/SQLi/path traversal/eval/exec; **Auto-Test Generator** synthesizing complete runnable `pytest`/`unittest` test suites for untested changes. |
+| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | Detect documentation drift from commits; generate structured markdown changelogs from merged PRs, update `CHANGELOG.md` & GitHub release body; **Semantic Breaking Changes & Migration Guide** detecting deleted/renamed public APIs and signature changes with Before/After migration guides. |
+| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | Fetch failed step logs from GitHub Actions run zip, diagnose root cause via LLM; **Real Auto-Heal PR** that automatically branches (`auto-fix/ci-run-<id>`), commits targeted file fix, and opens a Pull Request with diagnosis and fix explanation. |
+| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | Translate docs to 5 languages (`id`, `zh`, `ja`, `es`, `ar`); **Contributor Lint & Onboarding Mentor** checking PR commit messages against Conventional Commits, verifying branch sync, and delivering empathetic personalized mentorship in contributor's native language. |
 
 ---
 
-## 📁 リポジトリ構造
+## 🌟 Advanced Superpowers
+
+### 1. Automated Bug Reproduction Harness (Issue Triage)
+When a bug report is filed, the triage agent analyzes stack traces and code snippets to synthesize a standalone, runnable reproduction script (`python`, `javascript`, or `sh`) and posts it directly to the issue:
+```bash
+# 🤖 Automated Bug Reproduction Harness
+# Run with one command:
+python repro.py
+```
+Critical bugs automatically receive `severity:critical` and `sla:24h` labels for expedited incident response.
+
+### 2. Auto-Test Generator & Security Rule Engine (PR Reviewer)
+- **Static Security Engine**: Diff additions are pre-scanned against patterns for API keys, OpenAI/GitHub/AWS tokens, JWT secrets, DB connection strings, SQL injection strings, directory traversal, and dynamic `eval`/`exec`.
+- **Auto-Test Generator**: If code changes lack unit tests, the reviewer generates a complete, copy-pasteable `pytest` or `unittest` test suite covering the new logic and edge cases.
+
+### 3. Semantic Breaking Changes & Migration Guide (Docs & Release)
+Automatically identifies breaking changes across merged pull requests (renamed/deleted APIs, altered function signatures, modified environment variables) and generates a dedicated `### ⚠️ Breaking Changes & Migration Guide` in `CHANGELOG.md` with step-by-step Before/After migration examples.
+
+### 4. Real Auto-Heal PRs (CI Debugger)
+When a CI workflow fails, the CI debugger diagnoses the failure and—for targeted, fixable errors (dependency pins, typos, syntax issues, broken imports)—creates a dedicated branch (`auto-fix/ci-run-<run_id>`), commits the fix using the GitHub API, and opens a Pull Request ready for review.
+
+### 5. Contributor Lint & Onboarding Mentor (Community & Translation)
+- **Conventional Commits Lint**: Inspects all commit subjects in the PR against conventional commit standards (`feat:`, `fix:`, `docs:`, `chore:`, etc.).
+- **Branch Sync Check**: Compares the PR branch against the target branch and warns if it has fallen behind.
+- **Localized Mentorship**: Detects the contributor's primary language from profile location/bio or PR content and delivers warm, localized mentorship and onboarding guidance.
+
+---
+
+## 📁 Repository Structure
 
 ```
 opensource-agents/
@@ -56,32 +84,32 @@ opensource-agents/
 
 ---
 
-## 🚀 Setup Instructions / Petunjuk Pengaturan
+## 🚀 Setup Instructions / セットアップ手順
 
-### 1. GitHub リポジトリシークレットの保存
+### 1. Store GitHub Repo Secret
 
-1. GitHub でリポジトリを開きます。
-2. **Settings** > **Secrets and variables** > **Actions** に移動します。
-3. **New repository secret** をクリックします。
+1. Open your repository on GitHub.
+2. Go to **Settings** > **Secrets and variables** > **Actions**.
+3. Click **New repository secret**.
 4. Name: `OPENAI_API_KEY`
-5. Value: `sk-...` で始まる OpenAI API キー
-6. **Add secret** をクリックします。
+5. Value: Your OpenAI API key starting with `sk-...`
+6. Click **Add secret**.
 
-> **メモ:** `GITHUB_TOKEN` は、GitHub Actions によって実行ごとに自動的に作成およびインジェクトされます。手動で追加する必要はありません。
+> **Note:** `GITHUB_TOKEN` is automatically created and injected by GitHub Actions for every run. You do not need to add it manually.
 
-### 2. ワークフロー権限の有効化
+### 2. Enable Workflow Permissions
 
-デフォルトでは、GitHub Actions トークンは新しいリポジトリで読み取り専用権限を持っています。書き込みアクセスを有効にしてください:
+By default, GitHub Actions tokens have read-only permissions in new repositories. Enable write access:
 
-1. **Settings** > **Actions** > **General** に移動します。
-2. **Workflow permissions** までスクロールします。
-3. **Read and write permissions** を選択します。
-4. **Allow GitHub Actions to create and approve pull requests** にチェックを入れます。
-5. **Save** をクリックします。
+1. Go to **Settings** > **Actions** > **General**.
+2. Scroll to **Workflow permissions**.
+3. Select **Read and write permissions**.
+4. Check **Allow GitHub Actions to create and approve pull requests**.
+5. Click **Save**.
 
-### 3. ローカルテスト
+### 3. Local Testing
 
-プッシュする前にスクリプトをローカルでテストするには:
+To test scripts locally before pushing:
 
 ```bash
 # Clone the repository
@@ -100,7 +128,7 @@ cp .env.example .env
 # Edit .env with your actual OPENAI_API_KEY and GITHUB_TOKEN
 ```
 
-すべてのスクリプトに対して構文チェックを実行します:
+Run a syntax check across all scripts:
 
 ```bash
 python -m py_compile scripts/*.py
@@ -108,15 +136,15 @@ python -m py_compile scripts/*.py
 
 ---
 
-## ⚙️ 設定とカスタマイズ
+## ⚙️ Configuration & Customization
 
-- **モデル**: すべてのスクリプトで高速な応答時間と低コストを実現するために `gpt-4o-mini` を使用しています。必要に応じて、`scripts/*.py` 内の `model="gpt-4o-mini"` を `gpt-4o` に変更できます。
-- **プロンプト**: プロジェクトのコーディング標準、トーン＆マナー、または特定の Issue ラベルに合わせて、`.github/prompts/` 内のプロンプトを編集します。
-- **重複のしきい値**: `scripts/issue_triage.py` 内の `DUPLICATE_THRESHOLD = 0.90` (0.0 から 1.0) を調整して、類似した Issue がフラグ付けされる厳格さを制御します。
-- **ターゲット言語**: `scripts/community_translate.py` 内の `TARGET_LANGUAGES` を変更して、言語コードを追加または削除します。
+- **Model**: All scripts use `gpt-4o-mini` for fast response times and low cost. You can change `model="gpt-4o-mini"` to `gpt-4o` in `scripts/*.py` if needed.
+- **Prompts**: Edit prompts in `.github/prompts/` to fit your project's coding standards, tone of voice, or specific issue labels.
+- **Duplicate Threshold**: In `scripts/issue_triage.py`, adjust `DUPLICATE_THRESHOLD = 0.90` (0.0 to 1.0) to control how aggressively similar issues are flagged.
+- **Target Languages**: In `scripts/community_translate.py`, modify `TARGET_LANGUAGES` to add or remove language codes.
 
 ---
 
-## 📄 ライセンス
+## 📄 License
 
-MIT License。オープンソースまたは商用プロジェクトで自由に使用および変更できます。
+MIT License. Free to use and modify for any open-source or commercial project.

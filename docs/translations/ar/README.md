@@ -2,23 +2,51 @@
 
 > 5 autonomous GitHub Actions agents powered by OpenAI GPT-4o-mini to streamline open-source project management: issue triage, PR review, documentation sync, CI failure debugging, and multi-language community translation.
 
-*وكلاء آلاتونوميون (أتمتة) لـ 5 من GitHub Actions مدعومون بواسطة OpenAI GPT-4o-mini لتسهيل إدارة مشاريع المصادر المفتوحة: فرز المشكلات (Issues)، مراجعة طلبات السحب (PRs)، مزامنة التوثيق والإصدارات، تشخيص أخطاء الـ CI، والترجمة المجتمعية متعددة اللغات.*
+*نظام أتمتة يتكون من 5 وكلاء (Agents) عبر GitHub Actions مدعومين بواسطة OpenAI GPT-4o-mini لتسهيل إدارة مشاريع المصادر المفتوحة: فرز المشكلات، مراجعة طلبات السحب (PR)، مزامنة التوثيق والإصدارات، تشخيص أخطاء التكامل المستمر (CI)، والترجمة المجتمعية متعددة اللغات.*
 
 ---
 
-## 🤖 الـ 5 وكلاء (The 5 Agents)
+## 🤖 The 5 Agents
 
-| الوكيل (Agent) | سير العمل (Workflow) | السكريبت (Script) | المشغل (Trigger) | القدرات (Capabilities) |
-|---|---|---|---|---|
-| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | تصنيف التسميات (`bug`, `enhancement`, `documentation`, `question`)، اكتشاف المشكلات المكررة عبر تشابه تضمينات جيب تمام (Cosine embeddings)، الإجابة عن الأسئلة بروابط الأسئلة الشائعة (FAQ) |
-| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | تحليل التغييرات الموحدة (Unified diff) بحثاً عن الأخطاء، الثغرات الأمنية، انتهاكات النمط، ومشكلات الأداء؛ نشر تعليق مراجعة منظم؛ التحذير عند غياب الاختبارات |
-| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | اكتشاف انحراف التوثيق من الـ commits؛ إنشاء سجل تغييرات (Changelog) منظم بصيغة Markdown من طلبات السحب المدمجة، تحديث `CHANGELOG.md`، وتحديث محتوى إصدار GitHub |
-| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | جلب سجلات الخطوات الفاشلة من ملف الـ zip لتشغيل GitHub Actions، تشخيص السبب الجذري عبر GPT، نشر تعليق على الـ PR أو إنشاء مشكلة تتبع مع إصلاح قابل للتنفيذ |
-| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | ترجمة التوثيق إلى 5 لغات (`id`, `zh`, `ja`, `es`, `ar`)، الترحيب بالمساهمين الجدد في أول طلب سحب (PR) لهم |
+| Agent | Workflow | Script | Trigger | Capabilities |
+|-------|----------|--------|---------|--------------|
+| **1. Issue Triage** | `.github/workflows/issue-triage.yml` | `scripts/issue_triage.py` | `issues: opened` | تصنيف التسميات (`bug`, `enhancement`, `documentation`, `question`)، اكتشاف المشكلات المكررة عبر تشابه التضمينات (cosine embeddings)، الإجابة على الأسئلة بروابط الأسئلة الشائعة (FAQ)، **تسجيل درجات الخطورة الذكية** (`low`, `medium`, `high`, `critical`) مع تسميات اتفاقية مستوى الخدمة التلقائية `sla:24h`، ومولد **أداة إعادة إنتاج الأخطاء الآلية (MRE)** مع التحقق بأمر واحد. |
+| **2. PR Reviewer** | `.github/workflows/pr-reviewer.yml` | `scripts/pr_reviewer.py` | `pull_request: opened, synchronize` | مراجعة الفروق الموحدة (Unified diff) للأخطاء، النمط، والأداء؛ **محرك الأمان الثابت** الذي يفحص الفروق بحثاً عن الأسرار المضمنة/الرموز/JWTs/روابط قواعد البيانات/حقن SQL/اجتاز المسار/eval/exec؛ **مولد الاختبارات التلقائي** الذي ينشئ مجموعات اختبار `pytest`/`unittest` كاملة وقابلة للتنفيذ للتغييرات غير المختبرة. |
+| **3. Docs & Release Notes** | `.github/workflows/docs-release.yml` | `scripts/docs_release.py` | `push: main`, `release: published` | اكتشاف انحراف التوثيق من الالتزامات (commits)؛ إنتاج سجلات التغيير المنظمة بلغة markdown من طلبات السحب المدمجة، تحديث `CHANGELOG.md` ونص إصدار GitHub؛ **التغييرات الكبرى الدلالية ودليل الهجرة** الذي يكتشف واجهات برمجة التطبيقات العامة المحذوفة/المعاد تسميتها وتغييرات التوقيع مع أدلة هجرة قبل/بعد. |
+| **4. CI Debugger** | `.github/workflows/ci-debug.yml` | `scripts/ci_debug.py` | `workflow_run: completed (failure)` | جلب سجلات الخطوات الفاشلة من ملف zip لتشغيل GitHub Actions، تشخيص السبب الجذري عبر نموذج اللغات الكبير (LLM)؛ **طلب سحب الإصلاح الذاتي الحقيقي** الذي ينشئ فرعاً تلقائياً (`auto-fix/ci-run-<id>`)، يلتزم بإصلاح الملف المستهدف، ويفتح طلب سحب مع التشخيص وشرح الإصلاح. |
+| **5. Community & Translation** | `.github/workflows/community-translate.yml` | `scripts/community_translate.py` | `issues: labeled ('translate')`, `schedule (weekly)`, `pull_request: opened` | ترجمة التوثيق إلى 5 لغات (`id`, `zh`, `ja`, `es`, `ar`)؛ **مرشد التدقيق والتوجيه للمساهمين** الذي يتحقق من رسائل الالتزام الخاصة بطلبات السحب مقابل معايير الالتزامات التقليدية (Conventional Commits)، ويتحقق من مزامنة الفروع، ويقدم إرشاداً تعاطفياً ومخصصاً بلغة المساهم الأم. |
 
 ---
 
-## 📁 هيكل المستودع (Repository Structure)
+## 🌟 Advanced Superpowers
+
+### 1. Automated Bug Reproduction Harness (Issue Triage)
+عند تقديم تقرير خطأ، يقوم وكيل الفرز بتحليل مسارات التكدس (stack traces) ومقتطفات الكود لتركيب نص برمجي مستقل وقابل للتنفيذ لإعادة الإنتاج (`python`، `javascript`، أو `sh`) وينشره مباشرة في المشكلة:
+```bash
+# 🤖 Automated Bug Reproduction Harness
+# Run with one command:
+python repro.py
+```
+تحصل الأخطاء الحرجة تلقائياً على تسميات `severity:critical` و `sla:24h` للاستجابة السريعة للحوادث.
+
+### 2. Auto-Test Generator & Security Rule Engine (PR Reviewer)
+- **محرك الأمان الثابت (Static Security Engine)**: تتم مراجعة إضافات الفروق مسبقاً بحثاً عن أنماط لمفاتيح API، رموز OpenAI/GitHub/AWS، أسرار JWT، سلاسل الاتصال بقواعد البيانات، سلاسل حقن SQL، اجتياز الدلائل، و `eval`/`exec` الديناميكي.
+- **مولد الاختبارات التلقائي (Auto-Test Generator)**: إذا كانت تغييرات الكود تفتقر إلى اختبارات الوحدة، يقوم المراجع بإنشاء مجموعة اختبار `pytest` أو `unittest` كاملة وقابلة للنسخ واللصق تغطي المنطق الجديد والحالات الحدية (edge cases).
+
+### 3. Semantic Breaking Changes & Migration Guide (Docs & Release)
+يحدد تلقائياً التغييرات الكبرى عبر طلبات السحب المدمجة (واجهات برمجة التطبيقات المعاد تسميتها/المحذوفة، تواقيع الدوال المعدلة، متغيرات البيئة المعدلة) وينشئ قسماً مخصصاً `### ⚠️ Breaking Changes & Migration Guide` في ملف `CHANGELOG.md` مع أمثلة هجرة خطوة بخطوة قبل/بعد.
+
+### 4. Real Auto-Heal PRs (CI Debugger)
+عند فشل سير عمل التكامل المستمر (CI)، يقوم منقح CI بتشخيص الفشل — وللأخطاء المستهدفة والقابلة للإصلاح (تثبيت التبعيات، الأخطاء الإملائية، أخطاء النحو، الواردات المكسورة) — بإنشاء فرع مخصص (`auto-fix/ci-run-<run_id>`)، والالتزام بالإصلاح باستخدام GitHub API، وفتح طلب سحب جاهز للمراجعة.
+
+### 5. Contributor Lint & Onboarding Mentor (Community & Translation)
+- **تدقيق الالتزامات التقليدية (Conventional Commits Lint)**: يفحص جميع عناوين الالتزامات في طلب السحب مقابل معايير الالتزامات التقليدية (`feat:`, `fix:`, `docs:`, `chore:`, إلخ).
+- **فحص مزامنة الفروع (Branch Sync Check)**: يقارن فرع طلب السحب بالفرع المستهدف ويحذر إذا تأخر عنه.
+- **الإرشاد المحلي (Localized Mentorship)**: يكتشف اللغة الأساسية للمساهم من موقع الملف الشخصي/السيرة الذاتية أو محتوى طلب السحب ويقدم توجيه إرشاد وترحيب دافئ ومحلي.
+
+---
+
+## 📁 Repository Structure
 
 ```
 opensource-agents/
@@ -56,32 +84,32 @@ opensource-agents/
 
 ---
 
-## 🚀 إرشادات الإعداد / Setup Instructions
+## 🚀 Setup Instructions / Petunjuk Pengaturan
 
-### 1. تخزين سر مستودع GitHub (Store GitHub Repo Secret)
+### 1. Store GitHub Repo Secret
 
-1. افتح مستودعك على GitHub.
-2. اذهب إلى **Settings** > **Secrets and variables** > **Actions**.
-3. انقر على **New repository secret**.
-4. الاسم (Name): `OPENAI_API_KEY`
-5. القيمة (Value): مفتاح OpenAI API الخاص بك والذي يبدأ بـ `sk-...`
-6. انقر على **Add secret**.
+1. Open your repository on GitHub.
+2. Go to **Settings** > **Secrets and variables** > **Actions**.
+3. Click **New repository secret**.
+4. Name: `OPENAI_API_KEY`
+5. Value: Your OpenAI API key starting with `sk-...`
+6. Click **Add secret**.
 
-> **ملاحظة:** يتم إنشاء وحقن `GITHUB_TOKEN` تلقائياً بواسطة GitHub Actions لكل عملية تشغيل. لست بحاجة إلى إضافته يدوياً.
+> **Note:** `GITHUB_TOKEN` is automatically created and injected by GitHub Actions for every run. You do not need to add it manually.
 
-### 2. تمكين صلاحيات سير العمل (Enable Workflow Permissions)
+### 2. Enable Workflow Permissions
 
-بشكل افتراضي، تمتلك رموز (Tokens) سير العمل في GitHub Actions صلاحيات القراءة فقط في المستودعات الجديدة. قم بتفعيل صلاحية الكتابة:
+By default, GitHub Actions tokens have read-only permissions in new repositories. Enable write access:
 
-1. اذهب إلى **Settings** > **Actions** > **General**.
-2. انتقل لأسفل إلى **Workflow permissions**.
-3. حدد **Read and write permissions**.
-4. ضع علامة صح على **Allow GitHub Actions to create and approve pull requests**.
-5. انقر على **Save**.
+1. Go to **Settings** > **Actions** > **General**.
+2. Scroll to **Workflow permissions**.
+3. Select **Read and write permissions**.
+4. Check **Allow GitHub Actions to create and approve pull requests**.
+5. Click **Save**.
 
-### 3. الاختبار المحلي (Local Testing)
+### 3. Local Testing
 
- لاختبار السكريبتات محلياً قبل الدفع (Push):
+To test scripts locally before pushing:
 
 ```bash
 # Clone the repository
@@ -100,7 +128,7 @@ cp .env.example .env
 # Edit .env with your actual OPENAI_API_KEY and GITHUB_TOKEN
 ```
 
-قم بتشغيل فحص بناء الجملة (Syntax check) عبر جميع السكريبتات:
+Run a syntax check across all scripts:
 
 ```bash
 python -m py_compile scripts/*.py
@@ -108,15 +136,15 @@ python -m py_compile scripts/*.py
 
 ---
 
-## ⚙️ التكوين والتخصيص (Configuration & Customization)
+## ⚙️ Configuration & Customization
 
-- **النموذج (Model):** تستخدم جميع السكريبتات `gpt-4o-mini` لتحقيق سرعة استجابة عالية وتكلفة منخفضة. يمكنك تغيير `model="gpt-4o-mini"` إلى `gpt-4o` في ملفات `scripts/*.py` إذا لزم الأمر.
-- **التوجيهات (Prompts):** قم بتعديل التوجيهات الموجودة في `.github/prompts/` لتناسب معايير البرمجة الخاصة بمشروعك، أو نبرة الصوت، أو تسميات المشكلات المحددة.
-- **حد التكرار (Duplicate Threshold):** في ملف `scripts/issue_triage.py`، قم بتعديل `DUPLICATE_THRESHOLD = 0.90` (من 0.0 إلى 1.0) للتحكم في مدى صرامة الإبلاغ عن المشكلات المتشابهة.
-- **اللغات المستهدفة (Target Languages):** في ملف `scripts/community_translate.py`، قم بتعديل `TARGET_LANGUAGES` لإضافة أو إزالة رموز اللغات.
+- **Model**: All scripts use `gpt-4o-mini` for fast response times and low cost. You can change `model="gpt-4o-mini"` to `gpt-4o` in `scripts/*.py` if needed.
+- **Prompts**: Edit prompts in `.github/prompts/` to fit your project's coding standards, tone of voice, or specific issue labels.
+- **Duplicate Threshold**: In `scripts/issue_triage.py`, adjust `DUPLICATE_THRESHOLD = 0.90` (0.0 to 1.0) to control how aggressively similar issues are flagged.
+- **Target Languages**: In `scripts/community_translate.py`, modify `TARGET_LANGUAGES` to add or remove language codes.
 
 ---
 
-## 📄 الترخيص (License)
+## 📄 License
 
-رخصة MIT. مجاني للاستخدام والتعديل لأي مشروع مفتوح المصدر أو تجاري.
+MIT License. Free to use and modify for any open-source or commercial project.

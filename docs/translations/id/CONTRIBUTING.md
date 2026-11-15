@@ -2,64 +2,64 @@
 
 Thank you for your interest in contributing to **opensource-agents**! We welcome contributions of all kinds: bug reports, feature requests, documentation improvements, and code changes.
 
-Terima kasih atas minat Anda untuk berkontribusi pada **opensource-agents**! Kami menyambut segala jenis kontribusi: laporan bug, permintaan fitur, perbaikan dokumentasi, dan perubahan kode.
+Terima kasih atas minat Anda untuk berkontribusi. Kami menerima semua bentuk kontribusi: laporan bug, permintaan fitur, perbaikan dokumentasi, dan kode.
 
 ---
 
-## Code of Conduct / Kode Etik
+## Code of Conduct
 
-- Be welcoming, inclusive, and respectful to all contributors.
-- Keep discussions constructive and focused on the technical work.
-- Harassment or discrimination of any form will not be tolerated.
+- Bersikaplah ramah, inklusif, dan penuh hormat kepada semua kontributor.
+- Jaga diskusi agar tetap membangun dan berfokus pada pekerjaan teknis.
+- Pelecehan atau diskriminasi dalam bentuk apa pun tidak akan ditoleransi.
 
 ---
 
 ## How to Contribute / Cara Berkontribusi
 
 ### 1. Reporting Issues / Melaporkan Issue
-- Check existing issues before opening a new one to avoid duplicates.
-- Use clear, descriptive titles.
-- For bug reports, include steps to reproduce, expected vs actual behavior, and system details.
+- Periksa issue yang sudah ada sebelum membuka yang baru untuk menghindari duplikasi.
+- Gunakan judul yang jelas dan deskriptif.
+- Untuk laporan bug, sertakan langkah-langkah untuk mereproduksi, perilaku yang diharapkan vs yang terjadi, serta detail sistem.
 
 ### 2. Pull Requests
-1. Fork the repository and create your branch from `main`:
+1. Lakukan fork pada repositori dan buat branch Anda dari `main`:
    ```bash
    git checkout -b feature/your-feature-name
    ```
-2. Install dependencies:
+2. Instal dependensi:
    ```bash
    pip install -r requirements.txt
    ```
-3. Make your changes:
-   - Follow PEP 8 conventions for Python scripts.
-   - Include docstrings and type annotations where sensible.
-   - If modifying scripts, ensure proper error handling and logging.
-   - Keep YAML workflows valid and use concurrency controls.
-4. Test locally before pushing:
+3. Lakukan perubahan Anda:
+   - Ikuti konvensi PEP 8 untuk skrip Python.
+   - Sertakan docstring dan anotasi tipe jika diperlukan.
+   - Jika memodifikasi skrip, pastikan penanganan error dan logging sudah tepat.
+   - Jaga agar workflow YAML tetap valid dan gunakan kontrol konkurensi.
+4. Uji secara lokal sebelum melakukan push:
    ```bash
    # Syntax check all scripts
    python -m py_compile scripts/*.py
    ```
-5. Commit with descriptive messages (e.g. `feat: add retry logic to pr_reviewer.py`).
-6. Push to your fork and submit a pull request against `main`.
+5. Lakukan commit dengan pesan yang deskriptif (mis. `feat: add retry logic to pr_reviewer.py`).
+6. Push ke fork Anda dan ajukan pull request ke branch `main`.
 
 ---
 
 ## Development Guidelines / Panduan Pengembangan
 
-- **AI Agents**: Scripts use `openai` v1+ syntax and target `gpt-4o-mini` to keep API costs minimal.
-- **Prompts**: Store system prompts in `.github/prompts/<agent_name>.txt` rather than embedding long strings in Python code.
-- **Secrets**: NEVER commit API keys or tokens. All scripts must read secrets via environment variables.
+- **AI Agents**: Skrip menggunakan sintaks `openai` v1+ dan menargetkan `gpt-4o-mini` untuk menjaga biaya API tetap minimal.
+- **Prompts**: Simpan system prompt di `.github/prompts/<agent_name>.txt` alih-alih menyematkan string panjang di dalam kode Python.
+- **Secrets**: JANGAN PERNAH melakukan commit API key atau token. Semua skrip harus membaca secret melalui environment variables.
 
 ---
 
 ## Translations / Terjemahan
 
-We maintain community translations for documentation files in `docs/translations/`:
+Kami memelihara terjemahan komunitas untuk file dokumentasi di `docs/translations/`:
 - `id` — Indonesian (Bahasa Indonesia)
 - `zh` — Simplified Chinese (简体中文)
 - `ja` — Japanese (日本語)
 - `es` — Spanish (Español)
 - `ar` — Arabic (العربية)
 
-To trigger automated translation updates, label an issue with `translate` or run the workflow manually via GitHub Actions.
+Untuk memicu pembaruan terjemahan otomatis, berikan label `translate` pada issue atau jalankan workflow secara manual melalui GitHub Actions.
